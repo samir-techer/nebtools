@@ -13,7 +13,7 @@
     <meta property="og:title" content="NebTools – Smart Tools for NEB Students">
     <meta property="og:description" content="The Ultimate Study Companion for NEB Students. Free tools for GPA calculation, accounting automation, and formula lookup.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://nebtools.github.io">
+    <meta property="og:url" content="https://samir-techer.github.io/utilitiesnepal/">
     <meta property="og:image" content="./assets/logo.png">
 
     <!-- Twitter Card -->
@@ -35,9 +35,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <!-- Styles -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
     <!-- Tesseract.js OCR Engine -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js?v=2"></script>
     <script>
         // Verify Tesseract loaded correctly
         window.addEventListener('load', function() {
@@ -52,6 +52,46 @@
     </script>
 </head>
 <body class="no-js">
+    <!-- JavaScript Test Indicator - removes itself if JS works -->
+    <div id="js-test" style="position:fixed; top:0; left:0; right:0; background:#f59e0b; color:#000; text-align:center; padding:12px; z-index:999999; font-family:Inter,sans-serif; font-size:14px; font-weight:600;">
+        <i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i>
+        Loading NebTools... If this message stays, JavaScript is not working.
+    </div>
+    <script>
+        // Immediate test - if this runs, JS is working
+        (function() {
+            var testDiv = document.getElementById('js-test');
+            if (testDiv) {
+                testDiv.innerHTML = '<i class="fas fa-check-circle" style="margin-right:8px; color:#22c55e;"></i> JavaScript is working! Loading tools...';
+                testDiv.style.background = '#0E7490';
+                testDiv.style.color = '#fff';
+                setTimeout(function() {
+                    if (testDiv && testDiv.parentNode) {
+                        testDiv.style.opacity = '0';
+                        testDiv.style.transition = 'opacity 0.5s';
+                        setTimeout(function() {
+                            if (testDiv && testDiv.parentNode) testDiv.remove();
+                        }, 500);
+                    }
+                }, 1500);
+            }
+        })();
+    </script>
+    <div id="js-error" style="display:none; position:fixed; top:0; left:0; right:0; background:#ef4444; color:white; text-align:center; padding:12px; z-index:99999; font-family:Inter,sans-serif; font-size:14px;">
+        <i class="fas fa-exclamation-circle"></i> <span id="js-error-msg">JavaScript error detected</span>
+    </div>
+    <script>
+        window.onerror = function(msg, url, line) {
+            console.error('JS Error:', msg, 'at line', line);
+            var errDiv = document.getElementById('js-error');
+            var errMsg = document.getElementById('js-error-msg');
+            if (errDiv && errMsg) {
+                errMsg.textContent = 'Error: ' + msg + ' (line ' + line + ')';
+                errDiv.style.display = 'block';
+            }
+            return true;
+        };
+    </script>
     <noscript>
         <style>
             .hero-content { animation: none !important; opacity: 1 !important; }
@@ -351,12 +391,12 @@
                     <div class="info-card glass">
                         <i class="fas fa-envelope"></i>
                         <h4>Email</h4>
-                        <a href="mailto:soundwaveai.np@gmail.com">soundwaveai.np@gmail.com</a>
+                        <a href="mailto:help.nebtools@gmail.com">help.nebtools@gmail.com</a>
                     </div>
                     <div class="info-card glass">
                         <i class="fas fa-globe"></i>
                         <h4>Website</h4>
-                        <span>nebtools.github.io</span>
+                        <span>samir-techer.github.io/utilitiesnepal</span>
                     </div>
                     <div class="info-card glass">
                         <i class="fas fa-share-alt"></i>
@@ -812,7 +852,11 @@
             </div>
 
             <!-- Step 1: Upload -->
-            <div id="scannerStepUpload" class="scanner-step active">
+            <div id="tesseract-error" style="display:none; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:12px; padding:16px; margin:16px 24px; text-align:center; color:#ef4444; font-size:0.9rem;">
+    <i class="fas fa-exclamation-circle" style="margin-right:8px;"></i>
+    OCR engine failed to load. Please check your internet connection or try the demo mode.
+</div>
+<div id="scannerStepUpload" class="scanner-step active">
                 <div class="upload-zone" id="uploadZone" onclick="document.getElementById('scannerFileInput').click()">
                     <input type="file" id="scannerFileInput" accept="image/*" style="display:none" onchange="handleScannerUpload(event)">
                     <div class="upload-icon">
@@ -982,6 +1026,6 @@
     </button>
 
     <!-- Scripts -->
-    <script src="script.js"></script>
+    <script src="script.js?v=2"></script>
 </body>
 </html>

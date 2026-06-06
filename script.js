@@ -1,9 +1,12 @@
+console.log('NebTools script loaded - v1.0');
+
 /**
  * NebTools - Main JavaScript
  * Premium educational tools for NEB Grade 11 & 12 students
  * @version 1.0.0
  * @author NebTools Team
  */
+
 
 // ============================================
 // Global State
@@ -116,15 +119,31 @@ const FORMULA_DB = [
 // Initialization
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
-    initializeTheme();
-    initializeNavigation();
-    initializeScrollReveal();
-    initializeBackToTop();
-    initializeContactForm();
-    initializeButtonRipple();
-    initializeHeroStats();
-    initializeFormulas();
-    initializeScanner();
+    console.log('NebTools: DOMContentLoaded fired');
+    try {
+        initializeTheme();
+        console.log('NebTools: Theme initialized');
+        initializeNavigation();
+        console.log('NebTools: Navigation initialized');
+        initializeScrollReveal();
+        console.log('NebTools: Scroll reveal initialized');
+        initializeBackToTop();
+        console.log('NebTools: Back to top initialized');
+        initializeContactForm();
+        console.log('NebTools: Contact form initialized');
+        initializeButtonRipple();
+        console.log('NebTools: Button ripple initialized');
+        initializeHeroStats();
+        console.log('NebTools: Hero stats initialized');
+        initializeFormulas();
+        console.log('NebTools: Formulas initialized');
+        initializeScanner();
+        console.log('NebTools: Scanner initialized');
+        console.log('NebTools: All systems initialized successfully!');
+    } catch (e) {
+        console.error('NebTools: Initialization error:', e);
+        alert('NebTools initialization error: ' + e.message);
+    }
 });
 
 // ============================================
@@ -925,8 +944,12 @@ const ACCOUNT_PATTERNS = {
 function initializeScanner() {
     // Only setup if scanner elements exist (lazy init)
     if (document.getElementById('uploadZone')) {
-        setupDragDrop();
-        resetScanner();
+        try {
+            setupDragDrop();
+            resetScanner();
+        } catch (e) {
+            console.warn('Scanner init warning:', e);
+        }
     }
 }
 
@@ -1070,10 +1093,20 @@ async function runScannerOCR() {
         return;
     }
 
-    // Check if Tesseract.js is loaded - try multiple access patterns
-    var TesseractObj = window.Tesseract || window.createWorker;
-    if (typeof Tesseract === 'undefined' && typeof window.createWorker === 'undefined') {
-        showToast('OCR library not loaded. Please check your internet connection and refresh.', 'error');
+    // Check if Tesseract.js is loaded - multiple safe checks
+    var tesseractAvailable = false;
+    try {
+        if (typeof window !== 'undefined' && window.Tesseract && typeof window.Tesseract.createWorker === 'function') {
+            tesseractAvailable = true;
+        }
+    } catch (e) {
+        console.warn('Tesseract check failed:', e);
+    }
+
+    if (!tesseractAvailable) {
+        var errDiv = document.getElementById('tesseract-error');
+        if (errDiv) errDiv.style.display = 'block';
+        showToast('OCR engine not available. Please try demo mode or check connection.', 'error');
         return;
     }
 
@@ -1094,8 +1127,16 @@ async function runScannerOCR() {
             progressFill.style.width = '15%';
 
             try {
-                // Tesseract.js v5 API - try different access patterns
-                var createWorkerFunc = Tesseract.createWorker || window.createWorker;
+                // Tesseract.js v4 API - create worker
+                var createWorkerFunc = null;
+                try {
+                    if (window.Tesseract && typeof window.Tesseract.createWorker === 'function') {
+                        createWorkerFunc = window.Tesseract.createWorker;
+                    }
+                } catch (e) {
+                    console.warn('Tesseract access failed:', e);
+                }
+
                 if (!createWorkerFunc) {
                     throw new Error('Tesseract createWorker not available');
                 }
