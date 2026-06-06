@@ -37,12 +37,11 @@
     <!-- Styles -->
     <link rel="stylesheet" href="style.css">
     <!-- Tesseract.js OCR Engine -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body class="no-js">
     <noscript>
         <style>
-            .loader-overlay { display: none !important; animation: none !important; }
             .hero-content { animation: none !important; opacity: 1 !important; }
             body { overflow: auto !important; }
         </style>
@@ -51,22 +50,6 @@
         </div>
     </noscript>
     <script>document.body.classList.remove('no-js');</script>
-    <!-- Loading Screen - Auto-hides after 2 seconds -->
-    <div id="loader" class="loader-overlay">
-        <div class="loader-content">
-            <div class="loader-logo">
-                <img src="./assets/logo.png" alt="NebTools" class="loader-icon-img">
-            </div>
-            <div class="loader-text">NebTools</div>
-            <div class="loader-bar">
-                <div class="loader-progress"></div>
-            </div>
-        </div>
-        <button class="loader-skip" onclick="document.getElementById('loader').classList.add('hidden')">
-            Skip Loading
-        </button>
-    </div>
-
     <!-- Navigation -->
     <nav id="navbar" class="navbar">
         <div class="nav-container">

@@ -116,10 +116,6 @@ const FORMULA_DB = [
 // Initialization
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
-    // Critical: hide loader first
-    initializeLoader();
-
-    // Then initialize other features
     initializeTheme();
     initializeNavigation();
     initializeScrollReveal();
@@ -134,19 +130,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================
 // Loader
 // ============================================
-function initializeLoader() {
-    // CSS already auto-hides loader after 2s
-    // This JS just ensures it hides immediately if called early
-    var loader = document.getElementById('loader');
-    if (loader && !loader.classList.contains('hidden')) {
-        // Check if CSS animation has already started hiding it
-        var computed = window.getComputedStyle(loader);
-        if (computed.opacity === '0' || computed.visibility === 'hidden') {
-            loader.classList.add('hidden');
-        }
-    }
-}
-
 // ============================================
 // Theme Toggle
 // ============================================
@@ -1110,6 +1093,7 @@ async function runScannerOCR() {
             progressFill.style.width = '15%';
 
             try {
+                // Tesseract.js v5 API: createWorker is async and takes language as first arg
                 SCANNER_STATE.tesseractWorker = await Tesseract.createWorker('eng', 1, {
                     logger: function(m) {
                         if (m.status === 'recognizing text') {
