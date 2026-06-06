@@ -7,7 +7,6 @@ console.log('NebTools script loaded - v1.0');
  * @author NebTools Team
  */
 
-
 // ============================================
 // Global State
 // ============================================
@@ -911,7 +910,6 @@ const SCANNER_STATE = {
     scannerStep: 0,
     imageScale: 1,
     imageRotation: 0,
-    tesseractWorker: null
 };
 
 // Account detection patterns
@@ -1093,10 +1091,10 @@ async function runScannerOCR() {
         return;
     }
 
-    // Check if Tesseract.js is loaded - multiple safe checks
+    // Check if Tesseract.js v2 is loaded
     var tesseractAvailable = false;
     try {
-        if (typeof window !== 'undefined' && window.Tesseract && typeof window.Tesseract.createWorker === 'function') {
+        if (typeof window !== 'undefined' && window.Tesseract && typeof window.Tesseract.recognize === 'function') {
             tesseractAvailable = true;
         }
     } catch (e) {
@@ -1110,63 +1108,34 @@ async function runScannerOCR() {
         return;
     }
 
-    const overlay = document.getElementById('previewOverlay');
-    const progressFill = document.getElementById('ocrProgressFill');
-    const ocrDetail = document.getElementById('ocrDetail');
-    const btnRun = document.getElementById('btnRunOCR');
+    var overlay = document.getElementById('previewOverlay');
+    var progressFill = document.getElementById('ocrProgressFill');
+    var ocrDetail = document.getElementById('ocrDetail');
+    var btnRun = document.getElementById('btnRunOCR');
 
     overlay.classList.add('active');
     btnRun.disabled = true;
-    progressFill.style.width = '0%';
-    ocrDetail.textContent = 'Loading OCR engine...';
+    progressFill.style.width = '10%';
+    ocrDetail.textContent = 'Initializing OCR...';
 
     try {
-        // Lazy load Tesseract - create worker on demand
-        if (!SCANNER_STATE.tesseractWorker) {
-            ocrDetail.textContent = 'Initializing Tesseract OCR engine...';
-            progressFill.style.width = '15%';
+        // Tesseract.js v2 API - direct recognize without workers
+        progressFill.style.width = '30%';
+        ocrDetail.textContent = 'Loading language data...';
 
-            try {
-                // Tesseract.js v4 API - create worker
-                var createWorkerFunc = null;
-                try {
-                    if (window.Tesseract && typeof window.Tesseract.createWorker === 'function') {
-                        createWorkerFunc = window.Tesseract.createWorker;
+        var result = await Tesseract.recognize(
+            SCANNER_STATE.currentImage,
+            'eng',
+            {
+                logger: function(m) {
+                    if (m.status === 'recognizing text') {
+                        progressFill.style.width = (30 + m.progress * 60) + '%';
+                        ocrDetail.textContent = 'Recognizing text: ' + Math.round(m.progress * 100) + '%';
                     }
-                } catch (e) {
-                    console.warn('Tesseract access failed:', e);
                 }
-
-                if (!createWorkerFunc) {
-                    throw new Error('Tesseract createWorker not available');
-                }
-                SCANNER_STATE.tesseractWorker = await createWorkerFunc('eng', 1, {
-                    logger: function(m) {
-                        if (m.status === 'recognizing text') {
-                            progressFill.style.width = (15 + m.progress * 70) + '%';
-                            ocrDetail.textContent = 'Recognizing text: ' + Math.round(m.progress * 100) + '%';
-                        } else if (m.status === 'loading language traineddata') {
-                            progressFill.style.width = '10%';
-                            ocrDetail.textContent = 'Loading language data...';
-                        }
-                    },
-                    errorHandler: function(err) {
-                        console.warn('Tesseract warning:', err);
-                    }
-                });
-            } catch (workerErr) {
-                console.error('Failed to create Tesseract worker:', workerErr);
-                overlay.classList.remove('active');
-                btnRun.disabled = false;
-                showToast('OCR engine failed to load. Please check your internet connection and try again.', 'error');
-                return;
             }
-        }
+        );
 
-        ocrDetail.textContent = 'Processing image...';
-        progressFill.style.width = '85%';
-
-        const result = await SCANNER_STATE.tesseractWorker.recognize(SCANNER_STATE.currentImage);
         SCANNER_STATE.ocrText = result.data.text;
 
         progressFill.style.width = '100%';
@@ -1183,8 +1152,20 @@ async function runScannerOCR() {
             // Parse the data
             parseOCRData();
 
-            // Enable next button
-            document.getElementById('scannerNextBtn').disabled = false;
+            // Enable next button and set it up for review step
+            var nextBtn = document.getElementById('scannerNextBtn');
+            nextBtn.disabled = false;
+            nextBtn.innerHTML = 'Review Data <i class="fas fa-arrow-right"></i>';
+            nextBtn.onclick = function() {
+                scannerGoToStep(4);
+                renderReviewScreen();
+                nextBtn.innerHTML = 'Confirm & Auto-Fill <i class="fas fa-arrow-right"></i>';
+                nextBtn.onclick = function() {
+                    prepareConfirmation();
+                    scannerGoToStep(5);
+                };
+            };
+
             showToast('OCR complete! ' + result.data.text.length + ' characters extracted.', 'success');
         }, 500);
 
@@ -1469,9 +1450,11 @@ function switchReviewTab(tab, event) {
 
 function goToReview() {
     scannerGoToStep(4);
-    document.getElementById('scannerNextBtn').disabled = false;
-    document.getElementById('scannerNextBtn').innerHTML = 'Confirm & Auto-Fill <i class="fas fa-arrow-right"></i>';
-    document.getElementById('scannerNextBtn').onclick = function() {
+    renderReviewScreen();
+    var nextBtn = document.getElementById('scannerNextBtn');
+    nextBtn.disabled = false;
+    nextBtn.innerHTML = 'Confirm & Auto-Fill <i class="fas fa-arrow-right"></i>';
+    nextBtn.onclick = function() {
         prepareConfirmation();
         scannerGoToStep(5);
     };
@@ -1676,14 +1659,29 @@ function scannerGoToStep(step) {
 
 function scannerNextStep() {
     if (SCANNER_STATE.scannerStep === 2) {
-        // From preview, go to review (skip raw if desired, or show raw)
+        // From preview, go to raw OCR (step 3)
+        scannerGoToStep(3);
+        document.getElementById('scannerNextBtn').innerHTML = 'Review Data <i class="fas fa-arrow-right"></i>';
+        document.getElementById('scannerNextBtn').onclick = function() {
+            scannerGoToStep(4);
+            renderReviewScreen();
+            document.getElementById('scannerNextBtn').innerHTML = 'Confirm & Auto-Fill <i class="fas fa-arrow-right"></i>';
+            document.getElementById('scannerNextBtn').onclick = function() {
+                prepareConfirmation();
+                scannerGoToStep(5);
+            };
+        };
+    } else if (SCANNER_STATE.scannerStep === 3) {
+        // From raw OCR, go to review
         scannerGoToStep(4);
+        renderReviewScreen();
         document.getElementById('scannerNextBtn').innerHTML = 'Confirm & Auto-Fill <i class="fas fa-arrow-right"></i>';
         document.getElementById('scannerNextBtn').onclick = function() {
             prepareConfirmation();
             scannerGoToStep(5);
         };
     } else if (SCANNER_STATE.scannerStep === 4) {
+        // From review, go to confirmation
         prepareConfirmation();
         scannerGoToStep(5);
     }
@@ -1774,11 +1772,4 @@ function useScannerDemo() {
 }
 
 // ============================================
-// Cleanup on page unload
-// ============================================
-window.addEventListener('beforeunload', function() {
-    if (SCANNER_STATE.tesseractWorker) {
-        SCANNER_STATE.tesseractWorker.terminate();
-    }
-});
 
