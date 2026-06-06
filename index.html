@@ -42,15 +42,16 @@
 <body class="no-js">
     <noscript>
         <style>
-            .loader-overlay { display: none !important; }
+            .loader-overlay { display: none !important; animation: none !important; }
             .hero-content { animation: none !important; opacity: 1 !important; }
+            body { overflow: auto !important; }
         </style>
         <div style="position:fixed; top:0; left:0; right:0; background:#0E7490; color:white; text-align:center; padding:12px; z-index:99999; font-family:Inter,sans-serif;">
             <i class="fas fa-exclamation-triangle"></i> JavaScript is required for NebTools to work. Please enable JavaScript in your browser settings.
         </div>
     </noscript>
     <script>document.body.classList.remove('no-js');</script>
-    <!-- Loading Screen -->
+    <!-- Loading Screen - Auto-hides after 2 seconds -->
     <div id="loader" class="loader-overlay">
         <div class="loader-content">
             <div class="loader-logo">
@@ -61,6 +62,9 @@
                 <div class="loader-progress"></div>
             </div>
         </div>
+        <button class="loader-skip" onclick="document.getElementById('loader').classList.add('hidden')">
+            Skip Loading
+        </button>
     </div>
 
     <!-- Navigation -->

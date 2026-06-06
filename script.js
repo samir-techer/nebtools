@@ -135,31 +135,16 @@ document.addEventListener('DOMContentLoaded', function() {
 // Loader
 // ============================================
 function initializeLoader() {
-    // Ensure loader hides even if DOM is slow
-    function hideLoader() {
-        var loader = document.getElementById('loader');
-        if (loader) {
+    // CSS already auto-hides loader after 2s
+    // This JS just ensures it hides immediately if called early
+    var loader = document.getElementById('loader');
+    if (loader && !loader.classList.contains('hidden')) {
+        // Check if CSS animation has already started hiding it
+        var computed = window.getComputedStyle(loader);
+        if (computed.opacity === '0' || computed.visibility === 'hidden') {
             loader.classList.add('hidden');
-            // Force remove after transition
-            setTimeout(function() {
-                if (loader.parentNode) {
-                    loader.style.display = 'none';
-                }
-            }, 600);
         }
     }
-
-    // Try immediately if DOM ready, otherwise wait
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(hideLoader, 1500);
-    } else {
-        window.addEventListener('load', function() {
-            setTimeout(hideLoader, 500);
-        });
-    }
-
-    // Fallback: always hide after 3 seconds max
-    setTimeout(hideLoader, 3000);
 }
 
 // ============================================
