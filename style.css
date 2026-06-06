@@ -99,6 +99,12 @@ html {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Loader hide fallback - if JS fails */
+.no-js .loader-overlay,
+.loader-overlay.force-hide {
+    display: none !important;
+}
+
 body {
     font-family: var(--font-family);
     background: var(--bg-dark);
@@ -184,6 +190,14 @@ img {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
+    display: none !important;
+}
+
+/* Force hide loader after timeout */
+.loader-overlay[data-hidden="true"] {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 .loader-content {
@@ -227,8 +241,15 @@ img {
 }
 
 @keyframes loaderPulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.1); opacity: 0.8; }
+    0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    25% { transform: scale(1.05) rotate(-2deg); opacity: 0.95; }
+    50% { transform: scale(1.1) rotate(0deg); opacity: 0.85; }
+    75% { transform: scale(1.05) rotate(2deg); opacity: 0.95; }
+}
+
+@keyframes loaderGlow {
+    0%, 100% { filter: drop-shadow(0 0 20px rgba(14, 116, 144, 0.4)); }
+    50% { filter: drop-shadow(0 0 40px rgba(14, 116, 144, 0.6)); }
 }
 
 @keyframes loaderProgress {
@@ -1278,7 +1299,13 @@ img {
     color: white;
 }
 
-.modal-body {
+.modal-/* Loader hide fallback - if JS fails */
+.no-js .loader-overlay,
+.loader-overlay.force-hide {
+    display: none !important;
+}
+
+body {
     padding: var(--space-xl) var(--space-2xl);
 }
 
@@ -1978,6 +2005,71 @@ img {
     }
 }
 
+
+/* ============================================
+   Logo Image Styles (Replaces SVG placeholders)
+   ============================================ */
+
+.logo-icon-img {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+    transition: transform var(--transition-fast);
+}
+
+.nav-logo:hover .logo-icon-img {
+    transform: scale(1.1) rotate(-5deg);
+}
+
+.loader-icon-img {
+    width: 100px;
+    height: auto;
+    max-height: 100px;
+    object-fit: contain;
+    animation: loaderPulse 1.5s ease-in-out infinite, loaderGlow 2s ease-in-out infinite;
+}
+
+.footer-logo-icon-img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    margin-bottom: var(--space-md);
+    filter: drop-shadow(0 0 10px rgba(14, 116, 144, 0.3));
+}
+
+/* Enhanced loader with logo */
+.loader-logo {
+    margin-bottom: var(--space-lg);
+}
+
+/* Dark mode logo adjustments */
+[data-theme="light"] .loader-icon-img {
+    filter: drop-shadow(0 0 15px rgba(14, 116, 144, 0.2));
+}
+
+[data-theme="light"] .footer-logo-icon-img {
+    filter: drop-shadow(0 0 8px rgba(14, 116, 144, 0.15));
+}
+
+/* Mobile logo sizing */
+@media (max-width: 768px) {
+    .logo-icon-img {
+        width: 32px;
+        height: 32px;
+    }
+
+    .loader-icon-img {
+        width: 80px;
+        max-height: 80px;
+    }
+
+    .footer-logo-icon-img {
+        width: 40px;
+        height: 40px;
+    }
+}
+
 /* ============================================
    Print Styles
    ============================================ */
@@ -2006,7 +2098,13 @@ img {
         border: none;
     }
 
-    body {
+    /* Loader hide fallback - if JS fails */
+.no-js .loader-overlay,
+.loader-overlay.force-hide {
+    display: none !important;
+}
+
+body {
         background: white;
         color: black;
     }
@@ -2058,7 +2156,13 @@ img {
     max-width: 900px;
 }
 
-.scanner-modal .modal-body {
+.scanner-modal .modal-/* Loader hide fallback - if JS fails */
+.no-js .loader-overlay,
+.loader-overlay.force-hide {
+    display: none !important;
+}
+
+body {
     padding: 0;
     max-height: 70vh;
     overflow-y: auto;
@@ -2741,6 +2845,79 @@ img {
     .preview-controls .btn-icon {
         width: 32px;
         height: 32px;
+    }
+}
+
+/* ============================================
+   Critical Mobile Performance Fixes
+   ============================================ */
+
+/* Prevent text size adjustment on orientation change */
+html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+}
+
+/* Smooth scrolling but respect user preferences */
+@media (prefers-reduced-motion: no-preference) {
+    html {
+        scroll-behavior: smooth;
+    }
+}
+
+/* Touch action optimization */
+.btn, .nav-link, .bento-card, .card-btn, .mobile-link, 
+.upload-zone, .review-tab-btn, .tab-btn, .preset-btn,
+.format-tag, .social-link, .theme-btn, .modal-close,
+.btn-icon, .raw-ocr-toggle, .cat-btn {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent horizontal scroll */
+body {
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Loader mobile optimization */
+@media (max-width: 768px) {
+    .loader-icon {
+        width: 60px;
+        height: 60px;
+    }
+
+    .loader-text {
+        font-size: 1.25rem;
+    }
+
+    .loader-bar {
+        width: 150px;
+    }
+}
+
+/* Fix for iOS Safari 100vh issue */
+@supports (-webkit-touch-callout: none) {
+    .hero {
+        min-height: -webkit-fill-available;
+    }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .gradient-orb,
+    .floating-icon,
+    .scroll-indicator,
+    .loader-progress {
+        animation: none !important;
     }
 }
 

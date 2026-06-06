@@ -116,7 +116,10 @@ const FORMULA_DB = [
 // Initialization
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
+    // Critical: hide loader first
     initializeLoader();
+
+    // Then initialize other features
     initializeTheme();
     initializeNavigation();
     initializeScrollReveal();
@@ -125,16 +128,38 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeButtonRipple();
     initializeHeroStats();
     initializeFormulas();
+    initializeScanner();
 });
 
 // ============================================
 // Loader
 // ============================================
 function initializeLoader() {
-    setTimeout(function() {
+    // Ensure loader hides even if DOM is slow
+    function hideLoader() {
         var loader = document.getElementById('loader');
-        loader.classList.add('hidden');
-    }, 1800);
+        if (loader) {
+            loader.classList.add('hidden');
+            // Force remove after transition
+            setTimeout(function() {
+                if (loader.parentNode) {
+                    loader.style.display = 'none';
+                }
+            }, 600);
+        }
+    }
+
+    // Try immediately if DOM ready, otherwise wait
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(hideLoader, 1500);
+    } else {
+        window.addEventListener('load', function() {
+            setTimeout(hideLoader, 500);
+        });
+    }
+
+    // Fallback: always hide after 3 seconds max
+    setTimeout(hideLoader, 3000);
 }
 
 // ============================================
@@ -930,8 +955,11 @@ const ACCOUNT_PATTERNS = {
 // Scanner Initialization
 // ============================================
 function initializeScanner() {
-    setupDragDrop();
-    resetScanner();
+    // Only setup if scanner elements exist (lazy init)
+    if (document.getElementById('uploadZone')) {
+        setupDragDrop();
+        resetScanner();
+    }
 }
 
 function setupDragDrop() {
@@ -1074,6 +1102,12 @@ async function runScannerOCR() {
         return;
     }
 
+    // Check if Tesseract.js is loaded
+    if (typeof Tesseract === 'undefined') {
+        showToast('OCR library not loaded. Please check your internet connection.', 'error');
+        return;
+    }
+
     const overlay = document.getElementById('previewOverlay');
     const progressFill = document.getElementById('ocrProgressFill');
     const ocrDetail = document.getElementById('ocrDetail');
@@ -1090,17 +1124,28 @@ async function runScannerOCR() {
             ocrDetail.textContent = 'Initializing Tesseract OCR engine...';
             progressFill.style.width = '15%';
 
-            SCANNER_STATE.tesseractWorker = await Tesseract.createWorker('eng', 1, {
-                logger: function(m) {
-                    if (m.status === 'recognizing text') {
-                        progressFill.style.width = (15 + m.progress * 70) + '%';
-                        ocrDetail.textContent = 'Recognizing text: ' + Math.round(m.progress * 100) + '%';
-                    } else if (m.status === 'loading language traineddata') {
-                        progressFill.style.width = '10%';
-                        ocrDetail.textContent = 'Loading language data...';
+            try {
+                SCANNER_STATE.tesseractWorker = await Tesseract.createWorker('eng', 1, {
+                    logger: function(m) {
+                        if (m.status === 'recognizing text') {
+                            progressFill.style.width = (15 + m.progress * 70) + '%';
+                            ocrDetail.textContent = 'Recognizing text: ' + Math.round(m.progress * 100) + '%';
+                        } else if (m.status === 'loading language traineddata') {
+                            progressFill.style.width = '10%';
+                            ocrDetail.textContent = 'Loading language data...';
+                        }
+                    },
+                    errorHandler: function(err) {
+                        console.warn('Tesseract warning:', err);
                     }
-                }
-            });
+                });
+            } catch (workerErr) {
+                console.error('Failed to create Tesseract worker:', workerErr);
+                overlay.classList.remove('active');
+                btnRun.disabled = false;
+                showToast('OCR engine failed to load. Please check your internet connection and try again.', 'error');
+                return;
+            }
         }
 
         ocrDetail.textContent = 'Processing image...';

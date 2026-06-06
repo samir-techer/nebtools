@@ -24,6 +24,7 @@
     <!-- Title & Favicon -->
     <title>NebTools – Smart Tools for NEB Students</title>
     <link rel="icon" type="image/png" href="./assets/favicon.png">
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -38,19 +39,22 @@
     <!-- Tesseract.js OCR Engine -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 </head>
-<body>
+<body class="no-js">
+    <noscript>
+        <style>
+            .loader-overlay { display: none !important; }
+            .hero-content { animation: none !important; opacity: 1 !important; }
+        </style>
+        <div style="position:fixed; top:0; left:0; right:0; background:#0E7490; color:white; text-align:center; padding:12px; z-index:99999; font-family:Inter,sans-serif;">
+            <i class="fas fa-exclamation-triangle"></i> JavaScript is required for NebTools to work. Please enable JavaScript in your browser settings.
+        </div>
+    </noscript>
+    <script>document.body.classList.remove('no-js');</script>
     <!-- Loading Screen -->
     <div id="loader" class="loader-overlay">
         <div class="loader-content">
             <div class="loader-logo">
-                <svg viewBox="0 0 100 100" class="loader-icon">
-                    <rect x="15" y="20" width="25" height="60" rx="3" fill="none" stroke="#0E7490" stroke-width="4"/>
-                    <rect x="20" y="25" width="15" height="50" rx="2" fill="#0E7490" opacity="0.3"/>
-                    <circle cx="65" cy="50" r="28" fill="none" stroke="#0891B2" stroke-width="4"/>
-                    <circle cx="65" cy="50" r="20" fill="none" stroke="#06B6D4" stroke-width="3" stroke-dasharray="8 4"/>
-                    <line x1="15" y1="50" x2="37" y2="50" stroke="#0E7490" stroke-width="4" stroke-linecap="round"/>
-                    <line x1="37" y1="50" x2="37" y2="30" stroke="#0E7490" stroke-width="4" stroke-linecap="round"/>
-                </svg>
+                <img src="./assets/logo.png" alt="NebTools" class="loader-icon-img">
             </div>
             <div class="loader-text">NebTools</div>
             <div class="loader-bar">
@@ -63,14 +67,7 @@
     <nav id="navbar" class="navbar">
         <div class="nav-container">
             <a href="#" class="nav-logo" aria-label="NebTools Home">
-                <svg viewBox="0 0 100 100" class="logo-icon">
-                    <rect x="15" y="20" width="25" height="60" rx="3" fill="none" stroke="currentColor" stroke-width="4"/>
-                    <rect x="20" y="25" width="15" height="50" rx="2" fill="currentColor" opacity="0.3"/>
-                    <circle cx="65" cy="50" r="28" fill="none" stroke="currentColor" stroke-width="4"/>
-                    <circle cx="65" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="8 4"/>
-                    <line x1="15" y1="50" x2="37" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                    <line x1="37" y1="50" x2="37" y2="30" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                </svg>
+                <img src="./assets/logo-nav.png" alt="NebTools" class="logo-icon-img" width="36" height="36">
                 <span class="logo-text">NebTools</span>
             </a>
 
@@ -412,14 +409,7 @@
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-brand">
-                <svg viewBox="0 0 100 100" class="footer-logo-icon">
-                    <rect x="15" y="20" width="25" height="60" rx="3" fill="none" stroke="currentColor" stroke-width="4"/>
-                    <rect x="20" y="25" width="15" height="50" rx="2" fill="currentColor" opacity="0.3"/>
-                    <circle cx="65" cy="50" r="28" fill="none" stroke="currentColor" stroke-width="4"/>
-                    <circle cx="65" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="8 4"/>
-                    <line x1="15" y1="50" x2="37" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                    <line x1="37" y1="50" x2="37" y2="30" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                </svg>
+                <img src="./assets/logo.png" alt="NebTools" class="footer-logo-icon-img" width="48" height="48">
                 <span class="footer-logo-text">NebTools</span>
                 <p class="footer-tagline">Smart Tools for NEB Students</p>
             </div>
