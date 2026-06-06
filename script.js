@@ -1215,9 +1215,7 @@ function parseOCRData() {
     };
 
     // Split into lines and process each
-    const lines = text.split(/
-?
-/);
+    const lines = text.split('\r\n').join('\n').split('\n');
 
     lines.forEach(function(line) {
         line = line.trim();
