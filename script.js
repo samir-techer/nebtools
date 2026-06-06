@@ -504,7 +504,7 @@ function removeRow(btn) {
     btn.closest('.input-row').remove();
 }
 
-function switchTab(tab) {
+function switchTab(tab, event) {
     document.querySelectorAll('.accounting-tabs .tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
     document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.remove('active'); });
 
@@ -608,7 +608,7 @@ function searchFormulas() {
     renderFormulas(filtered);
 }
 
-function filterCategory(category) {
+function filterCategory(category, event) {
     document.querySelectorAll('.cat-btn').forEach(function(btn) { btn.classList.remove('active'); });
     if (event && event.target) {
         event.target.classList.add('active');
@@ -647,7 +647,7 @@ function initializePercentage() {
     document.getElementById('pctTotalResult').textContent = 'Result: -';
 }
 
-function switchCalcTab(tab) {
+function switchCalcTab(tab, event) {
     document.querySelectorAll('.calc-tabs .tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
     document.querySelectorAll('.calc-content').forEach(function(content) { content.classList.remove('active'); });
 
@@ -1070,9 +1070,10 @@ async function runScannerOCR() {
         return;
     }
 
-    // Check if Tesseract.js is loaded
-    if (typeof Tesseract === 'undefined') {
-        showToast('OCR library not loaded. Please check your internet connection.', 'error');
+    // Check if Tesseract.js is loaded - try multiple access patterns
+    var TesseractObj = window.Tesseract || window.createWorker;
+    if (typeof Tesseract === 'undefined' && typeof window.createWorker === 'undefined') {
+        showToast('OCR library not loaded. Please check your internet connection and refresh.', 'error');
         return;
     }
 
@@ -1093,8 +1094,12 @@ async function runScannerOCR() {
             progressFill.style.width = '15%';
 
             try {
-                // Tesseract.js v5 API: createWorker is async and takes language as first arg
-                SCANNER_STATE.tesseractWorker = await Tesseract.createWorker('eng', 1, {
+                // Tesseract.js v5 API - try different access patterns
+                var createWorkerFunc = Tesseract.createWorker || window.createWorker;
+                if (!createWorkerFunc) {
+                    throw new Error('Tesseract createWorker not available');
+                }
+                SCANNER_STATE.tesseractWorker = await createWorkerFunc('eng', 1, {
                     logger: function(m) {
                         if (m.status === 'recognizing text') {
                             progressFill.style.width = (15 + m.progress * 70) + '%';
@@ -1413,7 +1418,7 @@ function removeReviewItem(btn) {
     }
 }
 
-function switchReviewTab(tab) {
+function switchReviewTab(tab, event) {
     document.querySelectorAll('.review-tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
     document.querySelectorAll('.review-tab-content').forEach(function(content) { content.classList.remove('active'); });
 

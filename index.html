@@ -38,6 +38,18 @@
     <link rel="stylesheet" href="style.css">
     <!-- Tesseract.js OCR Engine -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script>
+        // Verify Tesseract loaded correctly
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (typeof Tesseract === 'undefined' && typeof window.createWorker === 'undefined') {
+                    console.warn('Tesseract.js failed to load from CDN. Scanner feature will be disabled.');
+                } else {
+                    console.log('Tesseract.js loaded successfully');
+                }
+            }, 2000);
+        });
+    </script>
 </head>
 <body class="no-js">
     <noscript>
@@ -476,9 +488,9 @@
         </div>
         <div class="modal-body">
             <div class="accounting-tabs">
-                <button class="tab-btn active" onclick="switchTab('trial')">Trial Balance</button>
-                <button class="tab-btn" onclick="switchTab('income')">Income Statement</button>
-                <button class="tab-btn" onclick="switchTab('balance')">Balance Sheet</button>
+                <button class="tab-btn active" onclick="switchTab('trial', event)">Trial Balance</button>
+                <button class="tab-btn" onclick="switchTab('income', event)">Income Statement</button>
+                <button class="tab-btn" onclick="switchTab('balance', event)">Balance Sheet</button>
             </div>
 
             <div id="trialTab" class="tab-content active">
@@ -631,10 +643,10 @@
                 <input type="text" id="formulaSearch" placeholder="Search formulas (e.g., 'depreciation', 'ratio', 'profit')..." oninput="searchFormulas()">
             </div>
             <div class="formula-categories">
-                <button class="cat-btn active" onclick="filterCategory('all')">All</button>
-                <button class="cat-btn" onclick="filterCategory('accounting')">Accounting</button>
-                <button class="cat-btn" onclick="filterCategory('economics')">Economics</button>
-                <button class="cat-btn" onclick="filterCategory('business')">Business</button>
+                <button class="cat-btn active" onclick="filterCategory('all', event)">All</button>
+                <button class="cat-btn" onclick="filterCategory('accounting', event)">Accounting</button>
+                <button class="cat-btn" onclick="filterCategory('economics', event)">Economics</button>
+                <button class="cat-btn" onclick="filterCategory('business', event)">Business</button>
             </div>
             <div id="formulaList" class="formula-list">
                 <!-- Formulas loaded dynamically -->
@@ -652,9 +664,9 @@
         </div>
         <div class="modal-body">
             <div class="calc-tabs">
-                <button class="tab-btn active" onclick="switchCalcTab('percent-of')">% of Number</button>
-                <button class="tab-btn" onclick="switchCalcTab('percent-change')">% Change</button>
-                <button class="tab-btn" onclick="switchCalcTab('percent-total')">% of Total</button>
+                <button class="tab-btn active" onclick="switchCalcTab('percent-of', event)">% of Number</button>
+                <button class="tab-btn" onclick="switchCalcTab('percent-change', event)">% Change</button>
+                <button class="tab-btn" onclick="switchCalcTab('percent-total', event)">% of Total</button>
             </div>
 
             <div id="percent-of" class="calc-content active">
@@ -878,23 +890,23 @@
                 </div>
 
                 <div class="review-tabs">
-                    <button class="review-tab-btn active" onclick="switchReviewTab('assets')">
+                    <button class="review-tab-btn active" onclick="switchReviewTab('assets', event)">
                         <i class="fas fa-building"></i> Assets
                         <span class="tab-count" id="countAssets">0</span>
                     </button>
-                    <button class="review-tab-btn" onclick="switchReviewTab('liabilities')">
+                    <button class="review-tab-btn" onclick="switchReviewTab('liabilities', event)">
                         <i class="fas fa-hand-holding-usd"></i> Liabilities
                         <span class="tab-count" id="countLiabilities">0</span>
                     </button>
-                    <button class="review-tab-btn" onclick="switchReviewTab('equity')">
+                    <button class="review-tab-btn" onclick="switchReviewTab('equity', event)">
                         <i class="fas fa-balance-scale"></i> Equity
                         <span class="tab-count" id="countEquity">0</span>
                     </button>
-                    <button class="review-tab-btn" onclick="switchReviewTab('revenue')">
+                    <button class="review-tab-btn" onclick="switchReviewTab('revenue', event)">
                         <i class="fas fa-chart-line"></i> Revenue
                         <span class="tab-count" id="countRevenue">0</span>
                     </button>
-                    <button class="review-tab-btn" onclick="switchReviewTab('expenses')">
+                    <button class="review-tab-btn" onclick="switchReviewTab('expenses', event)">
                         <i class="fas fa-receipt"></i> Expenses
                         <span class="tab-count" id="countExpenses">0</span>
                     </button>
