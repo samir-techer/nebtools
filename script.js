@@ -880,3 +880,847 @@ if ('serviceWorker' in navigator) {
         console.log('Service Worker registration failed:', err);
     });
 }
+
+// ============================================
+// Smart Accounting Scanner (Beta)
+// Client-side OCR using Tesseract.js
+// ============================================
+
+const SCANNER_STATE = {
+    currentImage: null,
+    ocrText: '',
+    extractedData: {
+        assets: [],
+        liabilities: [],
+        equity: [],
+        revenue: [],
+        expenses: []
+    },
+    scannerStep: 0,
+    imageScale: 1,
+    imageRotation: 0,
+    tesseractWorker: null
+};
+
+// Account detection patterns
+const ACCOUNT_PATTERNS = {
+    assets: {
+        keywords: ['cash', 'bank', 'inventory', 'stock', 'debtors', 'accounts receivable', 'receivable', 'furniture', 'fixture', 'machinery', 'equipment', 'building', 'land', 'vehicle', 'prepaid', 'goodwill', 'patent', 'investment', 'deposits', 'advances', 'loan given', 'bills receivable', 'accrued income', 'outstanding income'],
+        type: 'asset'
+    },
+    liabilities: {
+        keywords: ['creditors', 'accounts payable', 'payable', 'loan', 'bank loan', 'mortgage', 'overdraft', 'bills payable', 'outstanding expense', 'accrued expense', 'unearned revenue', 'deferred revenue', 'provision', 'reserve', 'bank overdraft'],
+        type: 'liability'
+    },
+    equity: {
+        keywords: ['capital', 'drawings', 'owner', 'proprietor', 'partner', 'share capital', 'retained earnings', 'reserve', 'general reserve', 'profit', 'loss'],
+        type: 'equity'
+    },
+    revenue: {
+        keywords: ['sales', 'revenue', 'commission received', 'interest received', 'discount received', 'rent received', 'dividend', 'profit', 'income', 'fees', 'service revenue', 'royalty', 'subscription'],
+        type: 'revenue'
+    },
+    expenses: {
+        keywords: ['purchases', 'rent', 'salary', 'wages', 'electricity', 'insurance', 'depreciation', 'interest paid', 'discount allowed', 'bad debts', 'repair', 'maintenance', 'advertising', 'marketing', 'stationery', 'travel', 'telephone', 'water', 'gas', 'fuel', 'commission paid', 'bank charges', 'legal fees', 'audit fees', ' Rates', 'tax', 'donation', 'loss', 'carriage', 'freight', 'return outward', 'return inward'],
+        type: 'expense'
+    }
+};
+
+// ============================================
+// Scanner Initialization
+// ============================================
+function initializeScanner() {
+    setupDragDrop();
+    resetScanner();
+}
+
+function setupDragDrop() {
+    const uploadZone = document.getElementById('uploadZone');
+    if (!uploadZone) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    uploadZone.addEventListener('drop', handleDrop, false);
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function highlight(e) {
+    document.getElementById('uploadZone').classList.add('dragover');
+}
+
+function unhighlight(e) {
+    document.getElementById('uploadZone').classList.remove('dragover');
+}
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files.length) handleScannerFiles(files[0]);
+}
+
+// ============================================
+// File Upload Handling
+// ============================================
+function handleScannerUpload(event) {
+    const file = event.target.files[0];
+    if (file) handleScannerFiles(file);
+}
+
+function handleScannerFiles(file) {
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+        showToast('Please upload a JPG, PNG, or WEBP image.', 'error');
+        return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        showToast('Image is too large. Please use an image under 10MB.', 'error');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        SCANNER_STATE.currentImage = e.target.result;
+        SCANNER_STATE.imageScale = 1;
+        SCANNER_STATE.imageRotation = 0;
+        showScannerPreview();
+    };
+    reader.onerror = function() {
+        showToast('Failed to read image. Please try another file.', 'error');
+    };
+    reader.readAsDataURL(file);
+}
+
+function showScannerPreview() {
+    if (!SCANNER_STATE.currentImage) return;
+
+    const img = document.getElementById('scannerPreviewImage');
+    img.src = SCANNER_STATE.currentImage;
+    img.style.transform = 'scale(1) rotate(0deg)';
+    document.getElementById('zoomLevel').textContent = '100%';
+
+    scannerGoToStep(2);
+    document.getElementById('scannerNextBtn').disabled = true;
+    document.getElementById('scannerNextBtn').innerHTML = 'Next Step <i class="fas fa-arrow-right"></i>';
+}
+
+function zoomScannerImage(delta) {
+    SCANNER_STATE.imageScale = Math.max(0.5, Math.min(3, SCANNER_STATE.imageScale + delta));
+    updateScannerImageTransform();
+    document.getElementById('zoomLevel').textContent = Math.round(SCANNER_STATE.imageScale * 100) + '%';
+}
+
+function rotateScannerImage() {
+    SCANNER_STATE.imageRotation = (SCANNER_STATE.imageRotation + 90) % 360;
+    updateScannerImageTransform();
+}
+
+function updateScannerImageTransform() {
+    const img = document.getElementById('scannerPreviewImage');
+    img.style.transform = 'scale(' + SCANNER_STATE.imageScale + ') rotate(' + SCANNER_STATE.imageRotation + 'deg)';
+}
+
+function removeScannerImage() {
+    SCANNER_STATE.currentImage = null;
+    SCANNER_STATE.ocrText = '';
+    document.getElementById('scannerPreviewImage').src = '';
+    document.getElementById('scannerFileInput').value = '';
+    scannerGoToStep(1);
+    document.getElementById('scannerNextBtn').disabled = true;
+}
+
+function resetScanner() {
+    SCANNER_STATE.currentImage = null;
+    SCANNER_STATE.ocrText = '';
+    SCANNER_STATE.extractedData = { assets: [], liabilities: [], equity: [], revenue: [], expenses: [] };
+    SCANNER_STATE.scannerStep = 0;
+    SCANNER_STATE.imageScale = 1;
+    SCANNER_STATE.imageRotation = 0;
+
+    document.getElementById('scannerPreviewImage').src = '';
+    document.getElementById('scannerFileInput').value = '';
+    document.getElementById('rawOCRText').textContent = '';
+    document.getElementById('rawOCRPanel').classList.remove('open');
+    document.getElementById('rawOCRToggleIcon').style.transform = 'rotate(0deg)';
+
+    scannerGoToStep(1);
+    document.getElementById('scannerNextBtn').disabled = true;
+    document.getElementById('scannerNextBtn').innerHTML = 'Next Step <i class="fas fa-arrow-right"></i>';
+    document.getElementById('scannerNextBtn').onclick = scannerNextStep;
+}
+
+// ============================================
+// OCR Processing with Tesseract.js
+// ============================================
+async function runScannerOCR() {
+    if (!SCANNER_STATE.currentImage) {
+        showToast('Please upload an image first.', 'error');
+        return;
+    }
+
+    const overlay = document.getElementById('previewOverlay');
+    const progressFill = document.getElementById('ocrProgressFill');
+    const ocrDetail = document.getElementById('ocrDetail');
+    const btnRun = document.getElementById('btnRunOCR');
+
+    overlay.classList.add('active');
+    btnRun.disabled = true;
+    progressFill.style.width = '0%';
+    ocrDetail.textContent = 'Loading OCR engine...';
+
+    try {
+        // Lazy load Tesseract - create worker on demand
+        if (!SCANNER_STATE.tesseractWorker) {
+            ocrDetail.textContent = 'Initializing Tesseract OCR engine...';
+            progressFill.style.width = '15%';
+
+            SCANNER_STATE.tesseractWorker = await Tesseract.createWorker('eng', 1, {
+                logger: function(m) {
+                    if (m.status === 'recognizing text') {
+                        progressFill.style.width = (15 + m.progress * 70) + '%';
+                        ocrDetail.textContent = 'Recognizing text: ' + Math.round(m.progress * 100) + '%';
+                    } else if (m.status === 'loading language traineddata') {
+                        progressFill.style.width = '10%';
+                        ocrDetail.textContent = 'Loading language data...';
+                    }
+                }
+            });
+        }
+
+        ocrDetail.textContent = 'Processing image...';
+        progressFill.style.width = '85%';
+
+        const result = await SCANNER_STATE.tesseractWorker.recognize(SCANNER_STATE.currentImage);
+        SCANNER_STATE.ocrText = result.data.text;
+
+        progressFill.style.width = '100%';
+        ocrDetail.textContent = 'OCR Complete!';
+
+        setTimeout(function() {
+            overlay.classList.remove('active');
+            btnRun.disabled = false;
+
+            // Show raw OCR
+            document.getElementById('rawOCRText').textContent = SCANNER_STATE.ocrText;
+            scannerGoToStep(3);
+
+            // Parse the data
+            parseOCRData();
+
+            // Enable next button
+            document.getElementById('scannerNextBtn').disabled = false;
+            showToast('OCR complete! ' + result.data.text.length + ' characters extracted.', 'success');
+        }, 500);
+
+    } catch (error) {
+        console.error('OCR Error:', error);
+        overlay.classList.remove('active');
+        btnRun.disabled = false;
+        showToast('OCR failed: ' + (error.message || 'Unknown error'), 'error');
+    }
+}
+
+// ============================================
+// Intelligent Data Parsing
+// ============================================
+function parseOCRData() {
+    const text = SCANNER_STATE.ocrText;
+    if (!text || !text.trim()) {
+        showToast('No text detected in image. Please try a clearer image.', 'error');
+        return;
+    }
+
+    SCANNER_STATE.extractedData = {
+        assets: [],
+        liabilities: [],
+        equity: [],
+        revenue: [],
+        expenses: []
+    };
+
+    // Split into lines and process each
+    const lines = text.split(/
+?
+/);
+
+    lines.forEach(function(line) {
+        line = line.trim();
+        if (!line || line.length < 3) return;
+
+        // Try to extract account name and value
+        const parsed = parseAccountingLine(line);
+        if (parsed) {
+            categorizeAccount(parsed);
+        }
+    });
+
+    // Also try regex patterns for table-like data
+    extractTableData(text);
+
+    // Render review screen
+    renderReviewScreen();
+}
+
+function parseAccountingLine(line) {
+    // Pattern: AccountName ... number (with dots, spaces, or tabs as separators)
+    // Examples: "Cash ........ 50,000" or "Cash        50000" or "Cash	50000"
+
+    // Remove common OCR artifacts
+    line = line.replace(/[|_]{2,}/g, ' ');
+    line = line.replace(/\.{3,}/g, ' ');
+    line = line.replace(/\s+/g, ' ').trim();
+
+    // Try to find number at end of line
+    const numberMatch = line.match(/([\d,]+(?:\.\d{1,2})?)\s*(?:Cr\.?|Dr\.?|CR|DR|cr|dr)?\s*$/);
+    if (!numberMatch) return null;
+
+    const numberStr = numberMatch[1].replace(/,/g, '');
+    const value = parseFloat(numberStr);
+    if (isNaN(value) || value === 0) return null;
+
+    // Extract account name (everything before the number)
+    let name = line.substring(0, line.indexOf(numberMatch[0])).trim();
+
+    // Clean up name
+    name = name.replace(/^[^a-zA-Z]+/, ''); // Remove leading non-letters
+    name = name.replace(/[^a-zA-Z\s]+$/, ''); // Remove trailing non-letters
+    name = name.trim();
+
+    if (!name || name.length < 2) return null;
+
+    // Check for debit/credit indicator
+    const isCredit = /(?:Cr\.?|CR|cr|credit)/.test(line);
+    const isDebit = /(?:Dr\.?|DR|dr|debit)/.test(line);
+
+    return {
+        name: name,
+        value: value,
+        isCredit: isCredit,
+        isDebit: isDebit,
+        confidence: calculateConfidence(name, value)
+    };
+}
+
+function extractTableData(text) {
+    // Look for patterns like: Name | Value | Value
+    // or: Name    Value    Value
+    const tablePattern = /([A-Za-z][A-Za-z\s]{2,30})\s+(\d[\d,\.\s]{3,15})\s+(\d[\d,\.\s]{3,15})?/g;
+    let match;
+
+    while ((match = tablePattern.exec(text)) !== null) {
+        const name = match[1].trim();
+        const val1 = parseFloat(match[2].replace(/[,\s]/g, ''));
+
+        if (!isNaN(val1) && val1 > 0) {
+            const parsed = {
+                name: name,
+                value: val1,
+                isCredit: false,
+                isDebit: true,
+                confidence: 'medium'
+            };
+            categorizeAccount(parsed);
+        }
+
+        if (match[3]) {
+            const val2 = parseFloat(match[3].replace(/[,\s]/g, ''));
+            if (!isNaN(val2) && val2 > 0) {
+                const parsed2 = {
+                    name: name + ' (Credit)',
+                    value: val2,
+                    isCredit: true,
+                    isDebit: false,
+                    confidence: 'medium'
+                };
+                categorizeAccount(parsed2);
+            }
+        }
+    }
+}
+
+function calculateConfidence(name, value) {
+    // Higher confidence if name matches known patterns
+    const lowerName = name.toLowerCase();
+    let matched = false;
+
+    Object.keys(ACCOUNT_PATTERNS).forEach(function(category) {
+        ACCOUNT_PATTERNS[category].keywords.forEach(function(keyword) {
+            if (lowerName.includes(keyword)) matched = true;
+        });
+    });
+
+    if (matched) return 'high';
+    if (value > 100 && value < 10000000) return 'medium';
+    return 'low';
+}
+
+function categorizeAccount(parsed) {
+    const lowerName = parsed.name.toLowerCase();
+    let category = null;
+
+    // Check each category
+    Object.keys(ACCOUNT_PATTERNS).forEach(function(cat) {
+        if (category) return;
+        ACCOUNT_PATTERNS[cat].keywords.forEach(function(keyword) {
+            if (category) return;
+            if (lowerName.includes(keyword)) {
+                category = cat;
+            }
+        });
+    });
+
+    // Default categorization based on position or heuristics
+    if (!category) {
+        // If value is large and no keyword match, guess based on common patterns
+        if (lowerName.includes('received') || lowerName.includes('income') || lowerName.includes('gain')) {
+            category = 'revenue';
+        } else if (lowerName.includes('paid') || lowerName.includes('expense') || lowerName.includes('charges')) {
+            category = 'expenses';
+        } else if (parsed.value > 50000) {
+            // Large values often assets or capital
+            category = 'assets';
+        } else {
+            category = 'expenses'; // Default fallback
+        }
+    }
+
+    if (category && SCANNER_STATE.extractedData[category]) {
+        // Avoid duplicates
+        const exists = SCANNER_STATE.extractedData[category].some(function(item) {
+            return item.name.toLowerCase() === parsed.name.toLowerCase();
+        });
+
+        if (!exists) {
+            SCANNER_STATE.extractedData[category].push(parsed);
+        }
+    }
+}
+
+// ============================================
+// Review Screen
+// ============================================
+function renderReviewScreen() {
+    const data = SCANNER_STATE.extractedData;
+
+    // Update counts
+    document.getElementById('countAssets').textContent = data.assets.length;
+    document.getElementById('countLiabilities').textContent = data.liabilities.length;
+    document.getElementById('countEquity').textContent = data.equity.length;
+    document.getElementById('countRevenue').textContent = data.revenue.length;
+    document.getElementById('countExpenses').textContent = data.expenses.length;
+
+    // Render each category
+    renderReviewList('assets', data.assets);
+    renderReviewList('liabilities', data.liabilities);
+    renderReviewList('equity', data.equity);
+    renderReviewList('revenue', data.revenue);
+    renderReviewList('expenses', data.expenses);
+}
+
+function renderReviewList(category, items) {
+    const container = document.getElementById('list' + category.charAt(0).toUpperCase() + category.slice(1));
+    container.innerHTML = '';
+
+    if (items.length === 0) {
+        container.innerHTML = '<div class="review-empty" style="text-align:center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>No ' + category + ' detected. Add manually below.</div>';
+        return;
+    }
+
+    items.forEach(function(item, index) {
+        const row = document.createElement('div');
+        row.className = 'review-item';
+        row.dataset.category = category;
+        row.dataset.index = index;
+
+        const confClass = 'confidence-' + (item.confidence || 'medium');
+        const confLabel = item.confidence === 'high' ? 'High' : item.confidence === 'medium' ? 'Medium' : 'Low';
+
+        row.innerHTML = '<input type="text" class="review-name" value="' + escapeHtml(item.name) + '" placeholder="Account name"><input type="number" class="review-value" value="' + item.value + '" placeholder="Amount"><span class="confidence-badge ' + confClass + '">' + confLabel + '</span><button class="btn-icon" onclick="removeReviewItem(this)" title="Remove"><i class="fas fa-trash"></i></button>';
+
+        container.appendChild(row);
+    });
+}
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function addReviewItem(category) {
+    const container = document.getElementById('list' + category.charAt(0).toUpperCase() + category.slice(1));
+
+    // Remove empty message if present
+    const emptyMsg = container.querySelector('.review-empty');
+    if (emptyMsg) emptyMsg.remove();
+
+    const row = document.createElement('div');
+    row.className = 'review-item';
+    row.dataset.category = category;
+    row.dataset.index = SCANNER_STATE.extractedData[category].length;
+
+    row.innerHTML = '<input type="text" class="review-name" value="" placeholder="Account name"><input type="number" class="review-value" value="" placeholder="Amount"><span class="confidence-badge confidence-high">Manual</span><button class="btn-icon" onclick="removeReviewItem(this)" title="Remove"><i class="fas fa-trash"></i></button>';
+
+    container.appendChild(row);
+
+    // Update count
+    const count = container.querySelectorAll('.review-item').length;
+    document.getElementById('count' + category.charAt(0).toUpperCase() + category.slice(1)).textContent = count;
+}
+
+function removeReviewItem(btn) {
+    const row = btn.closest('.review-item');
+    const category = row.dataset.category;
+    row.remove();
+
+    // Update count
+    const container = document.getElementById('list' + category.charAt(0).toUpperCase() + category.slice(1));
+    const count = container.querySelectorAll('.review-item').length;
+    document.getElementById('count' + category.charAt(0).toUpperCase() + category.slice(1)).textContent = count;
+
+    if (count === 0) {
+        container.innerHTML = '<div class="review-empty" style="text-align:center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>No ' + category + ' detected. Add manually below.</div>';
+    }
+}
+
+function switchReviewTab(tab) {
+    document.querySelectorAll('.review-tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
+    document.querySelectorAll('.review-tab-content').forEach(function(content) { content.classList.remove('active'); });
+
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
+    document.getElementById('review' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+}
+
+function goToReview() {
+    scannerGoToStep(4);
+    document.getElementById('scannerNextBtn').disabled = false;
+    document.getElementById('scannerNextBtn').innerHTML = 'Confirm & Auto-Fill <i class="fas fa-arrow-right"></i>';
+    document.getElementById('scannerNextBtn').onclick = function() {
+        prepareConfirmation();
+        scannerGoToStep(5);
+    };
+}
+
+function toggleRawOCR() {
+    const panel = document.getElementById('rawOCRPanel');
+    const toggle = document.querySelector('.raw-ocr-toggle');
+    const icon = document.getElementById('rawOCRToggleIcon');
+
+    panel.classList.toggle('open');
+    toggle.classList.toggle('open');
+
+    if (panel.classList.contains('open')) {
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+// ============================================
+// Confirmation & Auto-Fill
+// ============================================
+function prepareConfirmation() {
+    const stats = document.getElementById('confirmStats');
+    const data = collectReviewData();
+
+    let totalAssets = 0, totalLiabilities = 0, totalEquity = 0, totalRevenue = 0, totalExpenses = 0;
+
+    data.assets.forEach(function(item) { totalAssets += item.value; });
+    data.liabilities.forEach(function(item) { totalLiabilities += item.value; });
+    data.equity.forEach(function(item) { totalEquity += item.value; });
+    data.revenue.forEach(function(item) { totalRevenue += item.value; });
+    data.expenses.forEach(function(item) { totalExpenses += item.value; });
+
+    stats.innerHTML = '<div class="confirm-stat"><span class="confirm-stat-value">' + data.assets.length + '</span><span class="confirm-stat-label">Assets</span></div><div class="confirm-stat"><span class="confirm-stat-value">Rs. ' + totalAssets.toLocaleString() + '</span><span class="confirm-stat-label">Total Assets</span></div><div class="confirm-stat"><span class="confirm-stat-value">' + data.liabilities.length + '</span><span class="confirm-stat-label">Liabilities</span></div><div class="confirm-stat"><span class="confirm-stat-value">Rs. ' + totalLiabilities.toLocaleString() + '</span><span class="confirm-stat-label">Total Liabilities</span></div><div class="confirm-stat"><span class="confirm-stat-value">' + data.equity.length + '</span><span class="confirm-stat-label">Equity</span></div><div class="confirm-stat"><span class="confirm-stat-value">Rs. ' + totalEquity.toLocaleString() + '</span><span class="confirm-stat-label">Total Equity</span></div><div class="confirm-stat"><span class="confirm-stat-value">' + data.revenue.length + '</span><span class="confirm-stat-label">Revenue</span></div><div class="confirm-stat"><span class="confirm-stat-value">Rs. ' + totalRevenue.toLocaleString() + '</span><span class="confirm-stat-label">Total Revenue</span></div><div class="confirm-stat"><span class="confirm-stat-value">' + data.expenses.length + '</span><span class="confirm-stat-label">Expenses</span></div><div class="confirm-stat"><span class="confirm-stat-value">Rs. ' + totalExpenses.toLocaleString() + '</span><span class="confirm-stat-label">Total Expenses</span></div>';
+}
+
+function collectReviewData() {
+    const data = { assets: [], liabilities: [], equity: [], revenue: [], expenses: [] };
+
+    ['assets', 'liabilities', 'equity', 'revenue', 'expenses'].forEach(function(category) {
+        const container = document.getElementById('list' + category.charAt(0).toUpperCase() + category.slice(1));
+        const items = container.querySelectorAll('.review-item');
+
+        items.forEach(function(item) {
+            const name = item.querySelector('.review-name').value.trim();
+            const value = parseFloat(item.querySelector('.review-value').value);
+
+            if (name && !isNaN(value) && value > 0) {
+                data[category].push({ name: name, value: value });
+            }
+        });
+    });
+
+    return data;
+}
+
+function autoFillAccounting() {
+    const data = collectReviewData();
+
+    // Close scanner modal
+    closeModal();
+
+    // Open accounting modal
+    setTimeout(function() {
+        openModal('accounting');
+
+        // Clear existing data
+        document.getElementById('trialInputs').innerHTML = '';
+        document.getElementById('revenueInputs').innerHTML = '';
+        document.getElementById('expenseInputs').innerHTML = '';
+        document.getElementById('assetInputs').innerHTML = '';
+        document.getElementById('liabilityInputs').innerHTML = '';
+
+        // Fill Trial Balance (assets + liabilities + equity)
+        var trialCount = 0;
+        data.assets.forEach(function(item) {
+            addTrialBalanceRow(item.name, item.value, 0);
+            trialCount++;
+        });
+        data.liabilities.forEach(function(item) {
+            addTrialBalanceRow(item.name, 0, item.value);
+            trialCount++;
+        });
+        data.equity.forEach(function(item) {
+            if (item.name.toLowerCase().includes('capital')) {
+                addTrialBalanceRow(item.name, 0, item.value);
+            } else {
+                addTrialBalanceRow(item.name, item.value, 0);
+            }
+            trialCount++;
+        });
+
+        if (trialCount === 0) addTrialBalanceRow('', 0, 0);
+
+        // Fill Revenue
+        var revCount = 0;
+        data.revenue.forEach(function(item) {
+            addRevenueRowWithData(item.name, item.value);
+            revCount++;
+        });
+        if (revCount === 0) addRevenueRowWithData('', 0);
+
+        // Fill Expenses
+        var expCount = 0;
+        data.expenses.forEach(function(item) {
+            addExpenseRowWithData(item.name, item.value);
+            expCount++;
+        });
+        if (expCount === 0) addExpenseRowWithData('', 0);
+
+        // Fill Assets for Balance Sheet
+        var assetCount = 0;
+        data.assets.forEach(function(item) {
+            addAssetRowWithData(item.name, item.value);
+            assetCount++;
+        });
+        if (assetCount === 0) addAssetRowWithData('', 0);
+
+        // Fill Liabilities for Balance Sheet
+        var liabCount = 0;
+        data.liabilities.forEach(function(item) {
+            addLiabilityRowWithData(item.name, item.value);
+            liabCount++;
+        });
+        if (liabCount === 0) addLiabilityRowWithData('', 0);
+
+        // Set capital if found in equity
+        data.equity.forEach(function(item) {
+            if (item.name.toLowerCase().includes('capital')) {
+                document.getElementById('capitalAmount').value = item.value;
+            }
+        });
+
+        showToast('Data auto-filled successfully! Please verify in the Accounting Automator.', 'success');
+
+        // Switch to trial balance tab
+        setTimeout(function() {
+            document.querySelectorAll('.accounting-tabs .tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
+            document.querySelectorAll('.tab-content').forEach(function(content) { content.classList.remove('active'); });
+            document.querySelector('.accounting-tabs .tab-btn:first-child').classList.add('active');
+            document.getElementById('trialTab').classList.add('active');
+        }, 300);
+
+    }, 400);
+}
+
+// Helper functions for auto-fill
+function addTrialBalanceRow(name, debit, credit) {
+    var container = document.getElementById('trialInputs');
+    var div = document.createElement('div');
+    div.innerHTML = '<div class="input-row"><input type="text" placeholder="Account Name" class="acct-name" value="' + escapeHtml(name) + '"><input type="number" placeholder="Debit (Rs.)" class="acct-debit" value="' + debit + '"><input type="number" placeholder="Credit (Rs.)" class="acct-credit" value="' + credit + '"><button class="btn-icon" onclick="removeRow(this)"><i class="fas fa-trash"></i></button></div>';
+    container.appendChild(div.firstElementChild);
+}
+
+function addRevenueRowWithData(name, amount) {
+    var container = document.getElementById('revenueInputs');
+    var div = document.createElement('div');
+    div.innerHTML = '<div class="input-row"><input type="text" placeholder="Revenue Item" class="rev-name" value="' + escapeHtml(name) + '"><input type="number" placeholder="Amount (Rs.)" class="rev-amount" value="' + amount + '"><button class="btn-icon" onclick="removeRow(this)"><i class="fas fa-trash"></i></button></div>';
+    container.appendChild(div.firstElementChild);
+}
+
+function addExpenseRowWithData(name, amount) {
+    var container = document.getElementById('expenseInputs');
+    var div = document.createElement('div');
+    div.innerHTML = '<div class="input-row"><input type="text" placeholder="Expense Item" class="exp-name" value="' + escapeHtml(name) + '"><input type="number" placeholder="Amount (Rs.)" class="exp-amount" value="' + amount + '"><button class="btn-icon" onclick="removeRow(this)"><i class="fas fa-trash"></i></button></div>';
+    container.appendChild(div.firstElementChild);
+}
+
+function addAssetRowWithData(name, amount) {
+    var container = document.getElementById('assetInputs');
+    var div = document.createElement('div');
+    div.innerHTML = '<div class="input-row"><input type="text" placeholder="Asset Name" class="asset-name" value="' + escapeHtml(name) + '"><input type="number" placeholder="Amount (Rs.)" class="asset-amount" value="' + amount + '"><button class="btn-icon" onclick="removeRow(this)"><i class="fas fa-trash"></i></button></div>';
+    container.appendChild(div.firstElementChild);
+}
+
+function addLiabilityRowWithData(name, amount) {
+    var container = document.getElementById('liabilityInputs');
+    var div = document.createElement('div');
+    div.innerHTML = '<div class="input-row"><input type="text" placeholder="Liability Name" class="liab-name" value="' + escapeHtml(name) + '"><input type="number" placeholder="Amount (Rs.)" class="liab-amount" value="' + amount + '"><button class="btn-icon" onclick="removeRow(this)"><i class="fas fa-trash"></i></button></div>';
+    container.appendChild(div.firstElementChild);
+}
+
+// ============================================
+// Scanner Navigation
+// ============================================
+function scannerGoToStep(step) {
+    SCANNER_STATE.scannerStep = step;
+
+    document.querySelectorAll('.scanner-step').forEach(function(s) { s.classList.remove('active'); });
+
+    if (step === 1) document.getElementById('scannerStepUpload').classList.add('active');
+    if (step === 2) document.getElementById('scannerStepPreview').classList.add('active');
+    if (step === 3) {
+        document.getElementById('scannerStepPreview').classList.add('active');
+        document.getElementById('scannerStepRaw').classList.add('active');
+    }
+    if (step === 4) document.getElementById('scannerStepReview').classList.add('active');
+    if (step === 5) document.getElementById('scannerStepConfirm').classList.add('active');
+}
+
+function scannerNextStep() {
+    if (SCANNER_STATE.scannerStep === 2) {
+        // From preview, go to review (skip raw if desired, or show raw)
+        scannerGoToStep(4);
+        document.getElementById('scannerNextBtn').innerHTML = 'Confirm & Auto-Fill <i class="fas fa-arrow-right"></i>';
+        document.getElementById('scannerNextBtn').onclick = function() {
+            prepareConfirmation();
+            scannerGoToStep(5);
+        };
+    } else if (SCANNER_STATE.scannerStep === 4) {
+        prepareConfirmation();
+        scannerGoToStep(5);
+    }
+}
+
+// ============================================
+// Demo Data
+// ============================================
+function useScannerDemo() {
+    // Create a demo canvas with sample accounting data
+    var canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    var ctx = canvas.getContext('2d');
+
+    // White background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 800, 600);
+
+    // Title
+    ctx.fillStyle = '#0E7490';
+    ctx.font = 'bold 28px Inter, sans-serif';
+    ctx.fillText('TRIAL BALANCE', 300, 50);
+
+    // Headers
+    ctx.fillStyle = '#111827';
+    ctx.font = 'bold 18px Inter, sans-serif';
+    ctx.fillText('Account Name', 50, 100);
+    ctx.fillText('Debit (Rs.)', 400, 100);
+    ctx.fillText('Credit (Rs.)', 600, 100);
+
+    // Line
+    ctx.strokeStyle = '#0E7490';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(40, 110);
+    ctx.lineTo(760, 110);
+    ctx.stroke();
+
+    // Data rows
+    ctx.font = '16px Inter, sans-serif';
+    var rows = [
+        ['Cash', '50,000', ''],
+        ['Bank', '120,000', ''],
+        ['Inventory', '80,000', ''],
+        ['Furniture', '40,000', ''],
+        ['Machinery', '150,000', ''],
+        ['Debtors', '30,000', ''],
+        ['Capital', '', '300,000'],
+        ['Creditors', '', '70,000'],
+        ['Sales', '', '250,000'],
+        ['Purchases', '200,000', ''],
+        ['Rent', '24,000', ''],
+        ['Salary', '60,000', ''],
+        ['Electricity', '6,000', ''],
+        ['Insurance', '12,000', '']
+    ];
+
+    var y = 140;
+    rows.forEach(function(row) {
+        ctx.fillStyle = '#374151';
+        ctx.fillText(row[0], 50, y);
+        ctx.fillText(row[1], 420, y);
+        ctx.fillText(row[2], 620, y);
+        y += 32;
+    });
+
+    // Total line
+    ctx.strokeStyle = '#0E7490';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(40, y + 5);
+    ctx.lineTo(760, y + 5);
+    ctx.stroke();
+
+    ctx.fillStyle = '#0E7490';
+    ctx.font = 'bold 18px Inter, sans-serif';
+    ctx.fillText('Total', 50, y + 30);
+    ctx.fillText('622,000', 400, y + 30);
+    ctx.fillText('620,000', 600, y + 30);
+
+    SCANNER_STATE.currentImage = canvas.toDataURL('image/png');
+    SCANNER_STATE.imageScale = 1;
+    SCANNER_STATE.imageRotation = 0;
+    showScannerPreview();
+
+    showToast('Demo image loaded! Click "Extract Data" to run OCR.', 'info');
+}
+
+// ============================================
+// Cleanup on page unload
+// ============================================
+window.addEventListener('beforeunload', function() {
+    if (SCANNER_STATE.tesseractWorker) {
+        SCANNER_STATE.tesseractWorker.terminate();
+    }
+});
+

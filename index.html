@@ -35,6 +35,8 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="style.css">
+    <!-- Tesseract.js OCR Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -205,6 +207,22 @@
                     </div>
                 </div>
 
+                <!-- Smart Accounting Scanner - Large Card -->
+                <div class="bento-card bento-large scanner-card" data-tool="scanner">
+                    <div class="card-glow"></div>
+                    <div class="scanner-badge">BETA</div>
+                    <div class="card-content">
+                        <div class="card-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <h3 class="card-title">Smart Accounting Scanner</h3>
+                        <p class="card-desc">Upload a photo of any accounting table and let AI extract the data automatically. Edit, verify, and auto-fill into Trial Balance, Income Statement & Balance Sheet.</p>
+                        <button class="btn btn-primary card-btn" onclick="openModal('scanner')">
+                            <i class="fas fa-magic"></i> Scan Document
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Formula Hub -->
                 <div class="bento-card" data-tool="formula">
                     <div class="card-glow"></div>
@@ -337,7 +355,7 @@
                     <div class="info-card glass">
                         <i class="fas fa-envelope"></i>
                         <h4>Email</h4>
-                        <a href="mailto:help.nebtools@gmail.com">help.nebtools@gmail.com</a>
+                        <a href="mailto:soundwaveai.np@gmail.com">soundwaveai.np@gmail.com</a>
                     </div>
                     <div class="info-card glass">
                         <i class="fas fa-globe"></i>
@@ -782,6 +800,187 @@
                 <button class="preset-btn" onclick="setTimer(5)">Break (5m)</button>
                 <button class="preset-btn" onclick="setTimer(15)">Long Break (15m)</button>
             </div>
+        </div>
+    </div>
+
+
+    <!-- Smart Accounting Scanner Modal -->
+    <div id="scannerModal" class="modal scanner-modal">
+        <div class="modal-header">
+            <h3><i class="fas fa-camera"></i> Smart Accounting Scanner <span class="beta-badge">BETA</span></h3>
+            <button class="modal-close" onclick="closeModal()" aria-label="Close modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <!-- Beta Notice -->
+            <div class="beta-notice">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <strong>Smart Scanner is currently in Beta.</strong>
+                    <span>For best results: use clear images, good lighting, straight tables, and high resolution screenshots. OCR accuracy may vary.</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Upload -->
+            <div id="scannerStepUpload" class="scanner-step active">
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('scannerFileInput').click()">
+                    <input type="file" id="scannerFileInput" accept="image/*" style="display:none" onchange="handleScannerUpload(event)">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h4>Upload Accounting Document</h4>
+                    <p>Drag & drop or click to select JPG, PNG, or WEBP</p>
+                    <div class="upload-formats">
+                        <span class="format-tag">JPG</span>
+                        <span class="format-tag">PNG</span>
+                        <span class="format-tag">WEBP</span>
+                    </div>
+                </div>
+                <div class="upload-actions">
+                    <button class="btn btn-secondary" onclick="document.getElementById('scannerFileInput').click()">
+                        <i class="fas fa-folder-open"></i> Browse Files
+                    </button>
+                    <button class="btn btn-outline" onclick="useScannerDemo()">
+                        <i class="fas fa-vial"></i> Try Demo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Preview & OCR -->
+            <div id="scannerStepPreview" class="scanner-step">
+                <div class="preview-container">
+                    <div class="preview-image-wrapper">
+                        <img id="scannerPreviewImage" src="" alt="Uploaded document">
+                        <div class="preview-overlay" id="previewOverlay">
+                            <div class="ocr-progress">
+                                <div class="ocr-spinner"></div>
+                                <div class="ocr-status">Analyzing Image...</div>
+                                <div class="ocr-progress-bar">
+                                    <div class="ocr-progress-fill" id="ocrProgressFill"></div>
+                                </div>
+                                <div class="ocr-detail" id="ocrDetail">Initializing OCR engine...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="preview-controls">
+                        <button class="btn-icon" onclick="zoomScannerImage(-0.2)" title="Zoom out"><i class="fas fa-minus"></i></button>
+                        <span id="zoomLevel">100%</span>
+                        <button class="btn-icon" onclick="zoomScannerImage(0.2)" title="Zoom in"><i class="fas fa-plus"></i></button>
+                        <button class="btn-icon" onclick="rotateScannerImage()" title="Rotate"><i class="fas fa-redo"></i></button>
+                        <button class="btn-icon btn-danger" onclick="removeScannerImage()" title="Remove"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div class="scanner-actions">
+                    <button class="btn btn-primary" id="btnRunOCR" onclick="runScannerOCR()">
+                        <i class="fas fa-magic"></i> Extract Data
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetScanner()">
+                        <i class="fas fa-upload"></i> Upload Different Image
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Raw OCR Output (Collapsible) -->
+            <div id="scannerStepRaw" class="scanner-step">
+                <div class="raw-ocr-toggle" onclick="toggleRawOCR()">
+                    <i class="fas fa-code"></i>
+                    <span>View Raw OCR Output</span>
+                    <i class="fas fa-chevron-down" id="rawOCRToggleIcon"></i>
+                </div>
+                <div class="raw-ocr-panel" id="rawOCRPanel">
+                    <pre id="rawOCRText"></pre>
+                </div>
+            </div>
+
+            <!-- Step 4: Review & Edit -->
+            <div id="scannerStepReview" class="scanner-step">
+                <div class="review-header">
+                    <h4><i class="fas fa-edit"></i> Review Extracted Data</h4>
+                    <p>Please verify and edit all values before proceeding. OCR may contain errors.</p>
+                </div>
+
+                <div class="review-tabs">
+                    <button class="review-tab-btn active" onclick="switchReviewTab('assets')">
+                        <i class="fas fa-building"></i> Assets
+                        <span class="tab-count" id="countAssets">0</span>
+                    </button>
+                    <button class="review-tab-btn" onclick="switchReviewTab('liabilities')">
+                        <i class="fas fa-hand-holding-usd"></i> Liabilities
+                        <span class="tab-count" id="countLiabilities">0</span>
+                    </button>
+                    <button class="review-tab-btn" onclick="switchReviewTab('equity')">
+                        <i class="fas fa-balance-scale"></i> Equity
+                        <span class="tab-count" id="countEquity">0</span>
+                    </button>
+                    <button class="review-tab-btn" onclick="switchReviewTab('revenue')">
+                        <i class="fas fa-chart-line"></i> Revenue
+                        <span class="tab-count" id="countRevenue">0</span>
+                    </button>
+                    <button class="review-tab-btn" onclick="switchReviewTab('expenses')">
+                        <i class="fas fa-receipt"></i> Expenses
+                        <span class="tab-count" id="countExpenses">0</span>
+                    </button>
+                </div>
+
+                <div class="review-content">
+                    <div id="reviewAssets" class="review-tab-content active">
+                        <div class="review-list" id="listAssets"></div>
+                        <button class="btn btn-sm btn-secondary" onclick="addReviewItem('assets')">
+                            <i class="fas fa-plus"></i> Add Asset
+                        </button>
+                    </div>
+                    <div id="reviewLiabilities" class="review-tab-content">
+                        <div class="review-list" id="listLiabilities"></div>
+                        <button class="btn btn-sm btn-secondary" onclick="addReviewItem('liabilities')">
+                            <i class="fas fa-plus"></i> Add Liability
+                        </button>
+                    </div>
+                    <div id="reviewEquity" class="review-tab-content">
+                        <div class="review-list" id="listEquity"></div>
+                        <button class="btn btn-sm btn-secondary" onclick="addReviewItem('equity')">
+                            <i class="fas fa-plus"></i> Add Equity Item
+                        </button>
+                    </div>
+                    <div id="reviewRevenue" class="review-tab-content">
+                        <div class="review-list" id="listRevenue"></div>
+                        <button class="btn btn-sm btn-secondary" onclick="addReviewItem('revenue')">
+                            <i class="fas fa-plus"></i> Add Revenue
+                        </button>
+                    </div>
+                    <div id="reviewExpenses" class="review-tab-content">
+                        <div class="review-list" id="listExpenses"></div>
+                        <button class="btn btn-sm btn-secondary" onclick="addReviewItem('expenses')">
+                            <i class="fas fa-plus"></i> Add Expense
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: Auto Fill Confirmation -->
+            <div id="scannerStepConfirm" class="scanner-step">
+                <div class="confirm-summary">
+                    <h4><i class="fas fa-check-circle"></i> Ready to Auto-Fill</h4>
+                    <div class="confirm-stats" id="confirmStats"></div>
+                    <p class="confirm-note">This will populate the Accounting Automator with your verified data. You can still edit values afterward.</p>
+                </div>
+                <div class="confirm-actions">
+                    <button class="btn btn-primary btn-lg" onclick="autoFillAccounting()">
+                        <i class="fas fa-magic"></i> Auto-Fill Accounting Automator
+                    </button>
+                    <button class="btn btn-secondary" onclick="goToReview()">
+                        <i class="fas fa-edit"></i> Back to Review
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer scanner-footer">
+            <button class="btn btn-outline" onclick="resetScanner()">
+                <i class="fas fa-redo"></i> Start Over
+            </button>
+            <button class="btn btn-primary" id="scannerNextBtn" onclick="scannerNextStep()" disabled>
+                Next Step <i class="fas fa-arrow-right"></i>
+            </button>
         </div>
     </div>
 
